@@ -17,7 +17,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -49,7 +49,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(syslog_messages_received_total)",
           "legendFormat": "Total Received",
           "refId": "A"
@@ -59,7 +59,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -91,7 +91,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(syslog_messages_forwarded_total)",
           "legendFormat": "Total Forwarded",
           "refId": "A"
@@ -101,7 +101,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -135,7 +135,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(syslog_messages_dropped_total)",
           "legendFormat": "Total Dropped",
           "refId": "A"
@@ -145,7 +145,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -178,7 +178,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "syslog_destination_up",
           "legendFormat": "{{destination}}",
           "refId": "A"
@@ -196,7 +196,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -246,7 +246,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(rate(syslog_messages_received_total[1m])) by (protocol)",
           "legendFormat": "{{protocol}}",
           "refId": "A"
@@ -256,7 +256,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -306,7 +306,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(rate(syslog_messages_forwarded_total[1m])) by (destination)",
           "legendFormat": "{{destination}}",
           "refId": "A"
@@ -324,7 +324,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -376,7 +376,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(rate(syslog_messages_received_total[5m])) by (facility)",
           "legendFormat": "{{facility}}",
           "refId": "A"
@@ -386,7 +386,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -471,7 +471,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(rate(syslog_messages_received_total[5m])) by (severity)",
           "legendFormat": "{{severity}}",
           "refId": "A"
@@ -489,7 +489,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -541,19 +541,19 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "histogram_quantile(0.50, sum(rate(syslog_processing_latency_seconds_bucket[5m])) by (le, filter))",
           "legendFormat": "p50 - {{filter}}",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "histogram_quantile(0.95, sum(rate(syslog_processing_latency_seconds_bucket[5m])) by (le, filter))",
           "legendFormat": "p95 - {{filter}}",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "histogram_quantile(0.99, sum(rate(syslog_processing_latency_seconds_bucket[5m])) by (le, filter))",
           "legendFormat": "p99 - {{filter}}",
           "refId": "C"
@@ -563,7 +563,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -613,7 +613,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "syslog_active_connections",
           "legendFormat": "{{input}}",
           "refId": "A"
@@ -631,7 +631,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -683,7 +683,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(rate(syslog_messages_parse_errors_total[5m])) by (protocol)",
           "legendFormat": "{{protocol}}",
           "refId": "A"
@@ -693,7 +693,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "datasource": { "type": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -745,7 +745,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus" },
           "expr": "sum(rate(syslog_messages_dropped_total[5m])) by (reason)",
           "legendFormat": "{{reason}}",
           "refId": "A"
