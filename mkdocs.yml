@@ -1,0 +1,88 @@
+site_name: Syslog Forwarder
+site_description: Lightweight syslog forwarding with simple YAML configuration
+site_author: brunseba
+site_url: https://brunseba.github.io/syslog-forwarder/
+
+repo_name: brunseba/syslog-forwarder
+repo_url: https://github.com/brunseba/syslog-forwarder
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: date
+  - with-pdf:
+      enabled_if_env: ENABLE_PDF_EXPORT
+      cover_title: Syslog Forwarder
+      cover_subtitle: Documentation
+      author: brunseba
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - def_list
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/brunseba/syslog-forwarder
+  version:
+    provider: mike
+
+nav:
+  - Home: index.md
+  - User Guide: user-guide.md
+  - Architecture: architecture.md
+  - PRD: PRD.md
