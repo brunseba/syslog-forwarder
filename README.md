@@ -10,6 +10,7 @@ A lightweight, pure Python syslog forwarder with simple YAML configuration.
 - **Simple YAML configuration** - No complex rsyslog/syslog-ng syntax to learn
 - **Multiple inputs** - Listen on UDP and TCP simultaneously
 - **Flexible filtering** - Route messages by facility, severity, hostname, or content
+- **Message transformation** - Rewrite, mask, or remove fields before forwarding
 - **Multiple destinations** - Forward to different servers based on rules
 - **RFC compliant** - Supports RFC 3164 (BSD) and RFC 5424 (modern) formats
 - **Prometheus metrics** - Built-in `/metrics` endpoint
@@ -159,20 +160,53 @@ filters:
     destinations: [central]
 ```
 
-### Split by severity
+## Transform Examples
+
+### Anonymize IP addresses
 
 ```yaml
+transforms:
+  - name: anonymize-ip
+    mask_patterns:
+      - pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b"
+        replacement: "x.x.x.x"
+
 filters:
-  - name: critical
-    match:
-      severity: [crit, alert, emerg]
-    destinations: [pagerduty, archive]
-  - name: errors
-    match:
-      severity: [err, warning]
-    destinations: [errors-queue]
-  - name: info
-    destinations: [general]
+  - name: forward-anonymized
+    transforms: [anonymize-ip]
+    destinations: [external-siem]
+```
+
+### Mask sensitive data
+
+```yaml
+transforms:
+  - name: mask-secrets
+    mask_patterns:
+      - pattern: "(password|token|api_key)=[^\\s]+"
+        replacement: "\\1=***REDACTED***"
+      - pattern: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}"
+        replacement: "***@***.***"
+
+filters:
+  - name: secure-forward
+    transforms: [mask-secrets]
+    destinations: [siem]
+```
+
+### Remove fields and rewrite hostname
+
+```yaml
+transforms:
+  - name: cleanup
+    remove_fields: [proc_id, structured_data]
+    set_fields:
+      hostname: "forwarded-logs"
+
+filters:
+  - name: forward-clean
+    transforms: [cleanup]
+    destinations: [central]
 ```
 
 ## Development

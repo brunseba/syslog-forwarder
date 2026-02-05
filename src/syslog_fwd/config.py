@@ -168,6 +168,92 @@ class FilterMatch(BaseModel):
         return v
 
 
+class ReplaceConfig(BaseModel):
+    """Configuration for regex replacement in messages."""
+
+    pattern: str = Field(..., description="Regex pattern to match")
+    replacement: str = Field(default="", description="Replacement string (supports \\1, \\2)")
+
+    @field_validator("pattern")
+    @classmethod
+    def validate_pattern(cls, v: str) -> str:
+        """Validate regex pattern."""
+        try:
+            re.compile(v)
+        except re.error as e:
+            raise ValueError(f"Invalid regex pattern: {e}") from e
+        return v
+
+
+class MaskConfig(BaseModel):
+    """Configuration for masking sensitive data."""
+
+    pattern: str = Field(..., description="Regex pattern to match sensitive data")
+    replacement: str = Field(default="***MASKED***", description="Replacement text")
+
+    @field_validator("pattern")
+    @classmethod
+    def validate_pattern(cls, v: str) -> str:
+        """Validate regex pattern."""
+        try:
+            re.compile(v)
+        except re.error as e:
+            raise ValueError(f"Invalid regex pattern: {e}") from e
+        return v
+
+
+class TransformConfig(BaseModel):
+    """Configuration for message transformation."""
+
+    name: str = Field(..., description="Unique name for this transformation")
+    match_pattern: str | None = Field(
+        default=None, description="Only apply to messages matching this regex"
+    )
+
+    # Field operations
+    remove_fields: list[str] | None = Field(
+        default=None,
+        description="Fields to remove: hostname, app_name, proc_id, msg_id, structured_data",
+    )
+    set_fields: dict[str, str] | None = Field(
+        default=None, description="Fields to set to specific values"
+    )
+
+    # Message content operations
+    message_replace: ReplaceConfig | None = Field(
+        default=None, description="Regex replacement in message content"
+    )
+    mask_patterns: list[MaskConfig] | None = Field(
+        default=None, description="Patterns to mask (e.g., passwords, IPs)"
+    )
+    message_prefix: str | None = Field(default=None, description="Prepend to message")
+    message_suffix: str | None = Field(default=None, description="Append to message")
+
+    @field_validator("match_pattern")
+    @classmethod
+    def validate_match_pattern(cls, v: str | None) -> str | None:
+        """Validate match pattern."""
+        if v is not None:
+            try:
+                re.compile(v)
+            except re.error as e:
+                raise ValueError(f"Invalid regex pattern: {e}") from e
+        return v
+
+    @field_validator("remove_fields")
+    @classmethod
+    def validate_remove_fields(cls, v: list[str] | None) -> list[str] | None:
+        """Validate remove_fields values."""
+        valid_fields = {"hostname", "app_name", "proc_id", "msg_id", "structured_data"}
+        if v:
+            for field in v:
+                if field not in valid_fields:
+                    raise ValueError(
+                        f"Invalid field '{field}'. Valid: {', '.join(valid_fields)}"
+                    )
+        return v
+
+
 class FilterConfig(BaseModel):
     """Configuration for a filter rule."""
 
@@ -176,6 +262,9 @@ class FilterConfig(BaseModel):
     action: Literal["forward", "drop"] = Field(default="forward", description="Action to take")
     destinations: list[str] | None = Field(
         default=None, description="Destination names to forward to"
+    )
+    transforms: list[str] | None = Field(
+        default=None, description="Transform names to apply before forwarding"
     )
 
     @model_validator(mode="after")
@@ -263,6 +352,9 @@ class Config(BaseModel):
         default="1", description="Config schema version"
     )
     inputs: list[InputConfig] = Field(default_factory=list, description="Input listeners")
+    transforms: list[TransformConfig] = Field(
+        default_factory=list, description="Message transformations"
+    )
     filters: list[FilterConfig] = Field(default_factory=list, description="Filter rules")
     destinations: list[DestinationConfig] = Field(
         default_factory=list, description="Forward destinations"
@@ -271,14 +363,24 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def validate_references(self) -> "Config":
-        """Validate that all referenced destinations exist."""
+        """Validate that all referenced destinations and transforms exist."""
         dest_names = {d.name for d in self.destinations}
+        transform_names = {t.name for t in self.transforms}
+
         for f in self.filters:
+            # Validate destination references
             if f.destinations:
                 for dest in f.destinations:
                     if dest not in dest_names:
                         raise ValueError(
                             f"Filter '{f.name}' references unknown destination '{dest}'"
+                        )
+            # Validate transform references
+            if f.transforms:
+                for transform in f.transforms:
+                    if transform not in transform_names:
+                        raise ValueError(
+                            f"Filter '{f.name}' references unknown transform '{transform}'"
                         )
         return self
 

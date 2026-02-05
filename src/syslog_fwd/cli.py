@@ -89,6 +89,7 @@ def validate(config_path: Path) -> None:
         config = load_config(config_path)
         click.echo(f"✓ Configuration is valid: {config_path}")
         click.echo(f"  Inputs: {len(config.inputs)}")
+        click.echo(f"  Transforms: {len(config.transforms)}")
         click.echo(f"  Filters: {len(config.filters)}")
         click.echo(f"  Destinations: {len(config.destinations)}")
 
@@ -98,12 +99,30 @@ def validate(config_path: Path) -> None:
             for inp in config.inputs:
                 click.echo(f"    - {inp.name}: {inp.protocol.value}://{inp.address}")
 
+        if config.transforms:
+            click.echo("\n  Transforms:")
+            for t in config.transforms:
+                ops = []
+                if t.remove_fields:
+                    ops.append(f"remove:{','.join(t.remove_fields)}")
+                if t.set_fields:
+                    ops.append(f"set:{','.join(t.set_fields.keys())}")
+                if t.mask_patterns:
+                    ops.append(f"mask:{len(t.mask_patterns)} patterns")
+                if t.message_replace:
+                    ops.append("replace")
+                if t.message_prefix:
+                    ops.append("prefix")
+                if t.message_suffix:
+                    ops.append("suffix")
+                click.echo(f"    - {t.name}: {', '.join(ops) if ops else '(no-op)'}")
+
         if config.filters:
             click.echo("\n  Filters:")
             for f in config.filters:
-                action = f.action
-                if action == "forward":
-                    click.echo(f"    - {f.name}: → {', '.join(f.destinations or [])}")
+                if f.action == "forward":
+                    transforms_str = f" [transforms: {', '.join(f.transforms)}]" if f.transforms else ""
+                    click.echo(f"    - {f.name}: → {', '.join(f.destinations or [])}{transforms_str}")
                 else:
                     click.echo(f"    - {f.name}: [DROP]")
 

@@ -2,7 +2,7 @@
 
 import asyncio
 import signal
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer
 from threading import Thread
 
 import structlog
@@ -13,6 +13,7 @@ from .filters import FilterEngine
 from .inputs import BaseInput, MessageHandler, create_input
 from .outputs import BaseOutput, create_output
 from .parser import SyslogMessage
+from .transformer import MessageTransformer
 
 logger = structlog.get_logger()
 
@@ -30,6 +31,7 @@ class SyslogForwarder:
         self.log = logger.bind(component="forwarder")
 
         # Initialize components
+        self.transformer = MessageTransformer(config.transforms)
         self.filter_engine = FilterEngine(config.filters)
         self.inputs: list[BaseInput] = []
         self.outputs: dict[str, BaseOutput] = {}
@@ -67,11 +69,16 @@ class SyslogForwarder:
             )
             return
 
+        # Apply transformations if specified in the filter
+        transformed_message = message
+        if result.transforms:
+            transformed_message = self.transformer.transform(message, result.transforms)
+
         # Forward to destinations
         for dest_name in result.destinations:
             output = self.outputs.get(dest_name)
             if output:
-                success = await output.send_with_retry(message)
+                success = await output.send_with_retry(transformed_message)
                 if not success:
                     self.log.warning(
                         "Failed to forward message",

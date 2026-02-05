@@ -21,6 +21,7 @@ class FilterResult:
     filter_name: str | None
     action: str  # "forward" or "drop"
     destinations: list[str]
+    transforms: list[str] | None = None
 
 
 class FilterEngine:
@@ -74,6 +75,7 @@ class FilterEngine:
                         filter_name=f.name,
                         action="drop",
                         destinations=[],
+                        transforms=None,
                     )
 
                 return FilterResult(
@@ -81,6 +83,7 @@ class FilterEngine:
                     filter_name=f.name,
                     action="forward",
                     destinations=f.destinations or [],
+                    transforms=f.transforms,
                 )
 
         # No filter matched - drop by default

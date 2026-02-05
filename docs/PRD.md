@@ -38,12 +38,20 @@ Need a simple tool to:
 ### 2.2 Filtering
 - Filter by facility (kern, user, mail, daemon, auth, etc.)
 - Filter by severity (emerg, alert, crit, err, warning, notice, info, debug)
-- Filter by hostname pattern (regex) - Phase 2
-- Filter by message content (regex) - Phase 2
+- Filter by hostname pattern (regex)
+- Filter by message content (regex)
 - Drop action (discard matching messages)
 - First-match-wins rule evaluation
 
-### 2.3 Forwarding (Output)
+### 2.3 Message Transformation
+- Remove fields (hostname, app_name, proc_id, msg_id, structured_data)
+- Set fields to specific values
+- Regex replacement in message content
+- Mask sensitive data (IPs, emails, passwords, tokens)
+- Add prefix/suffix to messages
+- Apply transforms per-filter (reusable transform definitions)
+
+### 2.4 Forwarding (Output)
 - Forward to multiple destinations
 - Protocols: UDP, TCP, TLS (Phase 2)
 - Per-destination format selection (RFC 3164 or RFC 5424)

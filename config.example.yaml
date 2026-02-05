@@ -17,16 +17,51 @@ inputs:
     protocol: tcp
     address: "0.0.0.0:514"
 
+# Message transformations
+# -----------------------
+# Define reusable transformations to modify messages before forwarding.
+transforms:
+  # Remove process ID from messages
+  - name: remove-pid
+    remove_fields: [proc_id]
+
+  # Anonymize IP addresses
+  - name: anonymize-ip
+    mask_patterns:
+      - pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b"
+        replacement: "x.x.x.x"
+
+  # Mask sensitive data (passwords, tokens)
+  - name: mask-secrets
+    mask_patterns:
+      - pattern: "(password|passwd|pwd|secret|token|api_key)[\\s]*[=:][\\s]*['\"]?([^'\"\\s]+)['\"]?"
+        replacement: "\\1=***REDACTED***"
+      - pattern: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"
+        replacement: "***@***.***"
+
+  # Rewrite hostname
+  - name: set-hostname
+    set_fields:
+      hostname: "forwarded-logs"
+
+  # Clean up message content
+  - name: cleanup-message
+    message_replace:
+      pattern: "\\s+"
+      replacement: " "
+    remove_fields: [structured_data]
+
 # Filter rules
 # ------------
 # Rules are evaluated in order. First match wins.
-# Each filter can either forward to destinations or drop the message.
+# Each filter can forward to destinations and optionally apply transforms.
 filters:
-  # Example: Forward auth/security logs to SIEM
+  # Example: Forward auth/security logs to SIEM with IP anonymization
   - name: security-logs
     match:
       facility: [auth, authpriv]
       severity: [warning, err, crit, alert, emerg]
+    transforms: [mask-secrets, anonymize-ip]
     destinations: [siem]
 
   # Example: Forward critical errors to alerting system
@@ -41,8 +76,9 @@ filters:
       severity: [debug]
     action: drop
 
-  # Example: Forward everything else to central logging
+  # Example: Forward everything else with cleanup
   - name: default
+    transforms: [remove-pid, cleanup-message]
     destinations: [central]
 
 # Destinations
