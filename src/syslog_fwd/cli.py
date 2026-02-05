@@ -222,6 +222,56 @@ def simulate(
         sock.close()
 
 
+@main.command("export")
+@click.option(
+    "--config",
+    "-c",
+    "config_path",
+    type=click.Path(exists=True, path_type=Path),
+    default="config.yaml",
+    help="Path to configuration file.",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output file (default: stdout).",
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["syslog-ng"]),
+    default="syslog-ng",
+    help="Output format.",
+)
+def export_config(config_path: Path, output: Path | None, output_format: str) -> None:
+    """Export configuration to other formats (e.g., syslog-ng)."""
+    from .export_syslogng import export_to_syslogng
+
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error loading configuration: {e}", err=True)
+        sys.exit(1)
+
+    if output_format == "syslog-ng":
+        result = export_to_syslogng(config)
+    else:
+        click.echo(f"Unsupported format: {output_format}", err=True)
+        sys.exit(1)
+
+    if output:
+        output.write_text(result)
+        click.echo(f"✓ Exported to {output}")
+    else:
+        click.echo(result)
+
+
 @main.command("init")
 @click.option("--output", "-o", type=click.Path(path_type=Path), default="config.yaml")
 def init_config(output: Path) -> None:
