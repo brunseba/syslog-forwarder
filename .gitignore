@@ -51,6 +51,8 @@ site/
 # Logs
 *.log
 logs/
+sandbox/syslog-receiver/logs/
+sandbox/grafana/data/
 
 # Local config
 config.yaml
