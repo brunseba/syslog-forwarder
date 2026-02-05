@@ -89,6 +89,29 @@ services:
       - monitoring
 
   # =============================================================================
+  # Syslog-ng forwarder (alternative to syslog-fwd using exported config)
+  # =============================================================================
+  syslog-ng-fwd:
+    image: linuxserver/syslog-ng:latest
+    container_name: syslog-ng-fwd
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    volumes:
+      - ./sandbox/syslog-ng-fwd/config/syslog-ng.conf:/config/syslog-ng.conf:ro
+    ports:
+      - "5516:514/udp"    # Different port to allow parallel testing
+      - "5516:514/tcp"
+    networks:
+      - syslog-net
+    depends_on:
+      - syslog-receiver
+    profiles:
+      - syslog-ng
+      - compare
+
+  # =============================================================================
   # Syslog simulator for testing
   # =============================================================================
   simulator:

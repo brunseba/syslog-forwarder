@@ -185,7 +185,7 @@ class TestExportSyslogNg:
     def test_export_remove_fields(self, complex_config: Config) -> None:
         """Test that remove_fields creates set() with empty value."""
         result = export_to_syslogng(complex_config)
-        assert 'set("" value("PID"))' in result
+        assert 'set("" value("PID"));' in result
 
     def test_export_transforms_in_log_paths(self, complex_config: Config) -> None:
         """Test that transforms are referenced in log paths."""
@@ -201,7 +201,7 @@ class TestExportSyslogNg:
         assert '${ISODATE} ${HOST} ${PROGRAM}[${PID}]: ${MSG}' in result
 
     def test_export_rfc5424_format(self, complex_config: Config) -> None:
-        """Test that RFC5424 format uses format-syslog."""
+        """Test that RFC5424 format uses RFC5424 template."""
         result = export_to_syslogng(complex_config)
         # siem destination uses RFC5424
-        assert '$(format-syslog)' in result
+        assert '<${PRI}>1 ${ISODATE}' in result

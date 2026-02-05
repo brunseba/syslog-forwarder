@@ -92,8 +92,9 @@ def _generate_destination(dest: DestinationConfig, index: int) -> str:
         transport = "tls"
 
     # Template based on format
+    # RFC5424: <PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID STRUCTURED-DATA MSG
     if dest.format == SyslogFormat.RFC5424:
-        template = '$(format-syslog)'
+        template = '<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} ${PID} ${MSGID} ${SDATA} ${MSG}'
     else:  # RFC3164 or AUTO
         template = '${ISODATE} ${HOST} ${PROGRAM}[${PID}]: ${MSG}'
 
@@ -118,25 +119,25 @@ def _generate_rewrite(transform: TransformConfig, index: int) -> str:
     # Message prefix
     if transform.message_prefix:
         prefix = _escape_syslogng_string(transform.message_prefix)
-        rules.append(f'        set("{prefix}${{MSG}}" value("MSG"))')
+        rules.append(f'        set("{prefix}${{MSG}}" value("MSG"));')
 
     # Message suffix
     if transform.message_suffix:
         suffix = _escape_syslogng_string(transform.message_suffix)
-        rules.append(f'        set("${{MSG}}{suffix}" value("MSG"))')
+        rules.append(f'        set("${{MSG}}{suffix}" value("MSG"));')
 
     # Message replace (regex substitution)
     if transform.message_replace:
         pattern = _escape_syslogng_string(transform.message_replace.pattern)
         replacement = _escape_syslogng_string(transform.message_replace.replacement)
-        rules.append(f'        subst("{pattern}", "{replacement}", value("MSG"))')
+        rules.append(f'        subst("{pattern}", "{replacement}", value("MSG"));')
 
     # Mask patterns
     if transform.mask_patterns:
         for mask in transform.mask_patterns:
             pattern = _escape_syslogng_string(mask.pattern)
             replacement = _escape_syslogng_string(mask.replacement)
-            rules.append(f'        subst("{pattern}", "{replacement}", value("MSG"), flags(global))')
+            rules.append(f'        subst("{pattern}", "{replacement}", value("MSG"), flags(global));')
 
     # Set fields
     if transform.set_fields:
@@ -149,7 +150,7 @@ def _generate_rewrite(transform: TransformConfig, index: int) -> str:
         for field, value in transform.set_fields.items():
             syslogng_field = field_map.get(field, field.upper())
             escaped_value = _escape_syslogng_string(value)
-            rules.append(f'        set("{escaped_value}" value("{syslogng_field}"))')
+            rules.append(f'        set("{escaped_value}" value("{syslogng_field}"));')
 
     # Remove fields (set to empty or "-")
     if transform.remove_fields:
@@ -163,7 +164,7 @@ def _generate_rewrite(transform: TransformConfig, index: int) -> str:
         for field in transform.remove_fields:
             if field in field_map:
                 syslogng_field, empty_value = field_map[field]
-                rules.append(f'        set("{empty_value}" value("{syslogng_field}"))')
+                rules.append(f'        set("{empty_value}" value("{syslogng_field}"));')
 
     if not rules:
         return ""
@@ -212,10 +213,10 @@ def _generate_filter(flt: FilterConfig, transforms: dict[str, TransformConfig], 
             conditions.append(f'message("{pattern}")')
 
     if not conditions:
-        # Match everything
+        # Match everything - use level range to catch all messages
         return f"""# Filter: {flt.name} (matches all)
 filter {filter_name} {{
-    match(".*" value("MSG"));
+    level(debug..emerg);
 }};
 
 """

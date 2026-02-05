@@ -1,4 +1,4 @@
-.PHONY: help build up down logs test dev monitoring clean validate simulate perf perf-test perf-long perf-long-test
+.PHONY: help build up down logs test dev monitoring clean validate simulate perf perf-test perf-long perf-long-test syslog-ng-up syslog-ng-export compare
 
 # Default target
 help:
@@ -25,6 +25,11 @@ help:
 	@echo "  make perf           - Burst test (10k messages)"
 	@echo "  make perf-long      - Long-running test (5 min @ 500 msg/s)"
 	@echo "  make perf-long-test - Custom long test (DURATION=min RATE=msg/s)"
+	@echo ""
+	@echo "Syslog-ng Comparison:"
+	@echo "  make syslog-ng-export - Export config to syslog-ng format"
+	@echo "  make syslog-ng-up     - Start syslog-ng forwarder (port 5516)"
+	@echo "  make compare          - Run both forwarders for comparison"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean      - Remove containers, volumes, and logs"
@@ -141,3 +146,39 @@ RATE ?= 500
 PROTOCOL ?= udp
 perf-long-test:
 	uv run python tests/perf/test_performance.py -h localhost -p 5514 -d $(DURATION) -r $(RATE) --protocol $(PROTOCOL) --report-interval 10
+
+# Export config to syslog-ng format
+syslog-ng-export:
+	uv run syslog-fwd export -c config.yaml -o sandbox/syslog-ng-fwd/config/syslog-ng.conf
+	@echo "✓ Exported to sandbox/syslog-ng-fwd/config/syslog-ng.conf"
+
+# Start syslog-ng forwarder (alternative implementation)
+syslog-ng-up:
+	docker compose --profile syslog-ng up -d syslog-ng-fwd syslog-receiver
+	@echo ""
+	@echo "syslog-ng forwarder started:"
+	@echo "  - Syslog input: localhost:5516 (UDP/TCP)"
+	@echo "  - Config: sandbox/syslog-ng-fwd/config/syslog-ng.conf"
+	@echo ""
+	@echo "To regenerate config: make syslog-ng-export"
+
+# Stop syslog-ng forwarder
+syslog-ng-down:
+	docker compose --profile syslog-ng down
+
+# Run both forwarders for comparison testing
+compare: syslog-ng-export
+	docker compose --profile compare up -d syslog-fwd syslog-ng-fwd syslog-receiver
+	@echo ""
+	@echo "Both forwarders running for comparison:"
+	@echo "  - syslog-fwd:    localhost:5514 (Python implementation)"
+	@echo "  - syslog-ng-fwd: localhost:5516 (syslog-ng with exported config)"
+	@echo "  - receiver:      localhost:5515 (destination)"
+	@echo ""
+	@echo "Send test messages:"
+	@echo "  To syslog-fwd:    syslog-fwd simulate -d localhost:5514"
+	@echo "  To syslog-ng-fwd: syslog-fwd simulate -d localhost:5516"
+
+# Stop comparison test
+compare-down:
+	docker compose --profile compare down
