@@ -70,7 +70,7 @@ validate:
 # Send test syslog messages
 simulate:
 	@echo "Sending test messages to localhost:5514..."
-	uv run syslog-fwd simulate -d localhost:5514 -p udp -c 5
+	uv run syslog-fwd simulate -d localhost:5514 -p udp -n 5
 	@echo ""
 	@echo "Check forwarded messages: make logs-receiver"
 
