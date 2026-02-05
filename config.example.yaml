@@ -1,0 +1,88 @@
+# Syslog Forwarder Configuration
+# ================================
+# Copy this file to config.yaml and customize for your environment.
+
+version: "1"
+
+# Input listeners
+# ---------------
+# Define where to receive syslog messages.
+# Supported protocols: udp, tcp (tls coming in Phase 2)
+inputs:
+  - name: udp-514
+    protocol: udp
+    address: "0.0.0.0:514"
+
+  - name: tcp-514
+    protocol: tcp
+    address: "0.0.0.0:514"
+
+# Filter rules
+# ------------
+# Rules are evaluated in order. First match wins.
+# Each filter can either forward to destinations or drop the message.
+filters:
+  # Example: Forward auth/security logs to SIEM
+  - name: security-logs
+    match:
+      facility: [auth, authpriv]
+      severity: [warning, err, crit, alert, emerg]
+    destinations: [siem]
+
+  # Example: Forward critical errors to alerting system
+  - name: critical-alerts
+    match:
+      severity: [crit, alert, emerg]
+    destinations: [siem, pagerduty]
+
+  # Example: Drop debug messages
+  - name: drop-debug
+    match:
+      severity: [debug]
+    action: drop
+
+  # Example: Forward everything else to central logging
+  - name: default
+    destinations: [central]
+
+# Destinations
+# ------------
+# Define where to forward messages.
+# Supported protocols: udp, tcp (tls coming in Phase 2)
+# Supported formats: rfc3164 (BSD), rfc5424 (modern), auto (preserve original)
+destinations:
+  - name: siem
+    protocol: tcp
+    address: "siem.example.com:514"
+    format: rfc5424
+    retry:
+      max_attempts: 3
+      backoff_seconds: 1.0
+
+  - name: pagerduty
+    protocol: tcp
+    address: "events.pagerduty.com:514"
+    format: rfc5424
+
+  - name: central
+    protocol: udp
+    address: "logs.example.com:514"
+    format: rfc3164
+
+# Service settings
+# ----------------
+service:
+  # Logging level: debug, info, warning, error
+  log_level: info
+
+  # Prometheus metrics endpoint
+  metrics:
+    enabled: true
+    address: "0.0.0.0:9090"
+
+# Environment variable substitution
+# ---------------------------------
+# You can use ${VAR} or ${VAR:-default} syntax:
+#
+#   address: "${SIEM_HOST:-siem.example.com}:514"
+#   address: "${LOG_SERVER}:${LOG_PORT:-514}"
