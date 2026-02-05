@@ -1,4 +1,4 @@
-.PHONY: help build up down logs test dev monitoring clean validate simulate
+.PHONY: help build up down logs test dev monitoring clean validate simulate perf perf-test
 
 # Default target
 help:
@@ -100,3 +100,24 @@ quicktest: up
 	@make simulate
 	@sleep 1
 	@make logs-receiver
+
+# Performance test with 10,000 messages
+perf: perf-up
+	@sleep 3
+	@echo "Running performance test (10,000 messages with 2-field removal)..."
+	uv run python tests/perf/test_performance.py -h localhost -p 5514 -n 10000 --protocol udp -t 120
+	@make perf-down
+
+# Start services for performance testing
+perf-up:
+	docker compose -f docker-compose.yml -f tests/perf/docker-compose.perf.yml up -d --build
+	@echo "Waiting for services to start..."
+	@sleep 5
+
+# Stop performance test services
+perf-down:
+	docker compose -f docker-compose.yml -f tests/perf/docker-compose.perf.yml down
+
+# Run performance test only (assumes services are up)
+perf-test:
+	uv run python tests/perf/test_performance.py -h localhost -p 5514 -n 10000 --protocol both -t 120

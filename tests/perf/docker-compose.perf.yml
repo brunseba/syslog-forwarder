@@ -1,0 +1,11 @@
+# Docker Compose override for performance testing
+# Usage: docker compose -f docker-compose.yml -f tests/perf/docker-compose.perf.yml up
+
+services:
+  syslog-fwd:
+    volumes:
+      - ./tests/perf/config-perf.yaml:/etc/syslog-fwd/config.yaml:ro
+    environment:
+      - LOG_LEVEL=warning
+      - DEST_HOST=syslog-receiver
+      - DEST_PORT=514

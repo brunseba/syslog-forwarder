@@ -1,0 +1,40 @@
+# Performance Test Configuration
+# ================================
+# Tests forwarding with field removal transforms
+
+version: "1"
+
+inputs:
+  - name: udp-perf
+    protocol: udp
+    address: "0.0.0.0:514"
+
+  - name: tcp-perf
+    protocol: tcp
+    address: "0.0.0.0:514"
+
+transforms:
+  # Remove 2 fields before forwarding
+  - name: remove-fields
+    remove_fields: [proc_id, msg_id]
+
+filters:
+  # Forward all messages with field removal
+  - name: perf-test
+    transforms: [remove-fields]
+    destinations: [receiver]
+
+destinations:
+  - name: receiver
+    protocol: tcp
+    address: "${DEST_HOST:-syslog-receiver}:${DEST_PORT:-514}"
+    format: rfc5424
+    retry:
+      max_attempts: 3
+      backoff_seconds: 0.5
+
+service:
+  log_level: ${LOG_LEVEL:-warning}
+  metrics:
+    enabled: true
+    address: "0.0.0.0:9090"
