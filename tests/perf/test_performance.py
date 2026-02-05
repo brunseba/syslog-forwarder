@@ -33,6 +33,20 @@ class PerfResults:
     errors: int
 
 
+@dataclass
+class IntervalStats:
+    """Stats for a single reporting interval."""
+
+    interval_num: int
+    timestamp: str
+    messages_sent: int
+    duration_seconds: float
+    messages_per_second: float
+    messages_received: int
+    messages_forwarded: int
+    success_rate: float
+
+
 def generate_rfc5424_message(seq: int, proc_id: str = "1234", msg_id: str = "ID47") -> bytes:
     """Generate an RFC 5424 syslog message with proc_id and msg_id fields."""
     # Priority: facility=local0 (16), severity=info (6) => 16*8+6 = 134
@@ -216,89 +230,282 @@ def print_results(results: PerfResults, protocol: str) -> None:
     click.echo("=" * 60 + "\n")
 
 
+async def run_long_test(
+    host: str,
+    port: int,
+    protocol: str,
+    duration_minutes: float,
+    rate: float,
+    report_interval: int,
+    metrics_url: str,
+) -> None:
+    """Run long-duration test with periodic reporting."""
+    import signal
+
+    duration_seconds = duration_minutes * 60
+    interval_messages = int(rate * report_interval)
+    stop_requested = False
+
+    def handle_signal(signum: int, frame: object) -> None:
+        nonlocal stop_requested
+        stop_requested = True
+        click.echo("\n⚠️  Stop requested, finishing current interval...")
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    click.echo(f"\n🚀 Starting long-running {protocol.upper()} test...")
+    click.echo(f"   Duration: {duration_minutes:.1f} minutes")
+    click.echo(f"   Target rate: {rate:.0f} msg/s")
+    click.echo(f"   Report every: {report_interval}s ({interval_messages:,} messages)")
+    click.echo("\n   Press Ctrl+C to stop gracefully\n")
+
+    # Print header
+    click.echo(
+        f"{'Interval':>8} | {'Time':>12} | {'Sent':>10} | {'Rate':>10} | "
+        f"{'Received':>10} | {'Forwarded':>10} | {'Success':>8}"
+    )
+    click.echo("-" * 90)
+
+    all_stats: list[IntervalStats] = []
+    total_sent = 0
+    total_received = 0
+    total_forwarded = 0
+    start_time = time.perf_counter()
+    interval_num = 0
+
+    # Get initial metrics
+    metrics_prev = await get_metrics(metrics_url)
+    if "error" in metrics_prev:
+        metrics_prev = {}
+
+    while not stop_requested:
+        elapsed = time.perf_counter() - start_time
+        if elapsed >= duration_seconds:
+            break
+
+        interval_num += 1
+        interval_start = time.perf_counter()
+
+        # Send messages for this interval
+        if protocol == "udp":
+            _, _ = await send_messages_udp(host, port, interval_messages, batch_size=100)
+        else:
+            _, _ = await send_messages_tcp(host, port, interval_messages, batch_size=100)
+
+        interval_duration = time.perf_counter() - interval_start
+        total_sent += interval_messages
+
+        # Wait for the rest of the interval if we finished early
+        remaining = report_interval - interval_duration
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+
+        # Get metrics
+        metrics_now = await get_metrics(metrics_url)
+        if "error" in metrics_now:
+            metrics_now = metrics_prev.copy()
+
+        received = int(
+            metrics_now.get("syslog_messages_received_total", 0)
+            - metrics_prev.get("syslog_messages_received_total", 0)
+        )
+        forwarded = int(
+            metrics_now.get("syslog_messages_forwarded_total", 0)
+            - metrics_prev.get("syslog_messages_forwarded_total", 0)
+        )
+        total_received += received
+        total_forwarded += forwarded
+
+        success_rate = (forwarded / interval_messages * 100) if interval_messages > 0 else 0
+        actual_rate = interval_messages / interval_duration if interval_duration > 0 else 0
+
+        timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
+        stats = IntervalStats(
+            interval_num=interval_num,
+            timestamp=timestamp,
+            messages_sent=interval_messages,
+            duration_seconds=interval_duration,
+            messages_per_second=actual_rate,
+            messages_received=received,
+            messages_forwarded=forwarded,
+            success_rate=success_rate,
+        )
+        all_stats.append(stats)
+
+        # Print interval stats
+        click.echo(
+            f"{interval_num:>8} | {timestamp:>12} | {interval_messages:>10,} | "
+            f"{actual_rate:>10,.0f} | {received:>10,} | {forwarded:>10,} | "
+            f"{success_rate:>7.1f}%"
+        )
+
+        metrics_prev = metrics_now
+
+    # Print summary
+    total_duration = time.perf_counter() - start_time
+    click.echo("\n" + "=" * 90)
+    click.echo("LONG-RUNNING TEST SUMMARY")
+    click.echo("=" * 90)
+    click.echo(f"\n📊 Overall Statistics:")
+    click.echo(f"   Total duration:     {total_duration / 60:.1f} minutes ({total_duration:.0f}s)")
+    click.echo(f"   Intervals:          {len(all_stats)}")
+    click.echo(f"   Total sent:         {total_sent:,}")
+    click.echo(f"   Total received:     {total_received:,}")
+    click.echo(f"   Total forwarded:    {total_forwarded:,}")
+
+    if total_sent > 0:
+        overall_success = (total_forwarded / total_sent) * 100
+        overall_rate = total_sent / total_duration if total_duration > 0 else 0
+        click.echo(f"   Average rate:       {overall_rate:,.0f} msg/s")
+        click.echo(f"   Overall success:    {overall_success:.2f}%")
+
+    if all_stats:
+        rates = [s.messages_per_second for s in all_stats]
+        click.echo(f"\n📈 Rate Statistics:")
+        click.echo(f"   Min rate:           {min(rates):,.0f} msg/s")
+        click.echo(f"   Max rate:           {max(rates):,.0f} msg/s")
+        click.echo(f"   Avg rate:           {statistics.mean(rates):,.0f} msg/s")
+        if len(rates) > 1:
+            click.echo(f"   Std dev:            {statistics.stdev(rates):,.0f} msg/s")
+
+    click.echo("=" * 90 + "\n")
+
+
 @click.command()
 @click.option("--host", "-h", default="localhost", help="Forwarder host.")
 @click.option("--port", "-p", default=5514, type=int, help="Forwarder port.")
 @click.option("--protocol", type=click.Choice(["udp", "tcp", "both"]), default="udp", help="Protocol to test.")
-@click.option("--count", "-n", default=10000, type=int, help="Number of messages to send.")
+@click.option("--count", "-n", default=10000, type=int, help="Number of messages to send (burst mode).")
+@click.option("--duration", "-d", default=0.0, type=float, help="Test duration in minutes (long-running mode).")
+@click.option("--rate", "-r", default=1000.0, type=float, help="Target messages per second (long-running mode).")
+@click.option("--report-interval", default=10, type=int, help="Reporting interval in seconds (long-running mode).")
 @click.option("--metrics-url", "-m", default="http://localhost:9090/metrics", help="Prometheus metrics URL.")
 @click.option("--warmup", "-w", default=100, type=int, help="Warmup messages before test.")
-@click.option("--timeout", "-t", default=60.0, type=float, help="Test timeout in seconds.")
+@click.option("--timeout", "-t", default=60.0, type=float, help="Test timeout in seconds (burst mode).")
 def main(
     host: str,
     port: int,
     protocol: str,
     count: int,
+    duration: float,
+    rate: float,
+    report_interval: int,
     metrics_url: str,
     warmup: int,
     timeout: float,
 ) -> None:
-    """Run performance test: send 10,000 messages with 2-field removal transform."""
+    """Run performance test for syslog-fwd.
+
+    Two modes available:
+
+    BURST MODE (default): Send a fixed number of messages as fast as possible.
+      Example: test_performance.py -n 10000 --protocol udp
+
+    LONG-RUNNING MODE: Send messages at a target rate for a specified duration.
+      Example: test_performance.py -d 60 -r 1000 --protocol tcp
+      (runs for 60 minutes at 1000 msg/s)
+    """
+    # Determine mode
+    long_running = duration > 0
+
     click.echo("=" * 60)
     click.echo("SYSLOG FORWARDER PERFORMANCE TEST")
     click.echo("=" * 60)
     click.echo(f"\nConfiguration:")
     click.echo(f"  Target:          {host}:{port}")
     click.echo(f"  Protocol:        {protocol}")
-    click.echo(f"  Message count:   {count:,}")
+
+    if long_running:
+        click.echo(f"  Mode:            LONG-RUNNING")
+        click.echo(f"  Duration:        {duration:.1f} minutes")
+        click.echo(f"  Target rate:     {rate:,.0f} msg/s")
+        click.echo(f"  Report interval: {report_interval}s")
+    else:
+        click.echo(f"  Mode:            BURST")
+        click.echo(f"  Message count:   {count:,}")
+        click.echo(f"  Warmup:          {warmup} messages")
+
     click.echo(f"  Transform:       remove 2 fields (proc_id, msg_id)")
-    click.echo(f"  Warmup:          {warmup} messages")
     click.echo(f"  Metrics URL:     {metrics_url}")
 
-    async def run_test() -> None:
-        protocols_to_test = ["udp", "tcp"] if protocol == "both" else [protocol]
+    if long_running:
+        # Long-running mode
+        proto = "tcp" if protocol == "tcp" else "udp"  # Default to UDP for "both"
+        if protocol == "both":
+            click.echo("\n⚠️  Long-running mode only supports single protocol, using UDP")
 
-        for proto in protocols_to_test:
-            click.echo(f"\n🚀 Starting {proto.upper()} test...")
+        try:
+            asyncio.run(
+                run_long_test(
+                    host, port, proto, duration, rate, report_interval, metrics_url
+                )
+            )
+        except KeyboardInterrupt:
+            click.echo("\n⚠️  Test interrupted")
+        except Exception as e:
+            click.echo(f"\n❌ Test failed: {e}", err=True)
+            raise SystemExit(1)
+    else:
+        # Burst mode (original behavior)
+        async def run_burst_test() -> None:
+            protocols_to_test = ["udp", "tcp"] if protocol == "both" else [protocol]
 
-            # Warmup
-            if warmup > 0:
-                click.echo(f"   Warming up with {warmup} messages...")
+            for proto in protocols_to_test:
+                click.echo(f"\n🚀 Starting {proto.upper()} test...")
+
+                # Warmup
+                if warmup > 0:
+                    click.echo(f"   Warming up with {warmup} messages...")
+                    if proto == "udp":
+                        await send_messages_udp(host, port, warmup)
+                    else:
+                        await send_messages_tcp(host, port, warmup, timeout=timeout)
+                    await asyncio.sleep(1)  # Let forwarder process warmup
+
+                # Get metrics before test
+                click.echo("   Fetching baseline metrics...")
+                metrics_before = await get_metrics(metrics_url)
+                if "error" in metrics_before:
+                    click.echo(f"   ⚠️  Could not fetch metrics: {metrics_before['error']}")
+                    metrics_before = {}
+
+                # Run test
+                click.echo(f"   Sending {count:,} messages...")
                 if proto == "udp":
-                    await send_messages_udp(host, port, warmup)
+                    test_duration, latencies = await send_messages_udp(host, port, count)
                 else:
-                    await send_messages_tcp(host, port, warmup, timeout=timeout)
-                await asyncio.sleep(1)  # Let forwarder process warmup
+                    test_duration, latencies = await send_messages_tcp(
+                        host, port, count, timeout=timeout
+                    )
 
-            # Get metrics before test
-            click.echo("   Fetching baseline metrics...")
-            metrics_before = await get_metrics(metrics_url)
-            if "error" in metrics_before:
-                click.echo(f"   ⚠️  Could not fetch metrics: {metrics_before['error']}")
-                metrics_before = {}
+                # Wait for processing
+                click.echo("   Waiting for processing to complete...")
+                await asyncio.sleep(2)
 
-            # Run test
-            click.echo(f"   Sending {count:,} messages...")
-            if proto == "udp":
-                duration, latencies = await send_messages_udp(host, port, count)
-            else:
-                duration, latencies = await send_messages_tcp(host, port, count, timeout=timeout)
+                # Get metrics after test
+                metrics_after = await get_metrics(metrics_url)
+                if "error" in metrics_after:
+                    click.echo(f"   ⚠️  Could not fetch metrics: {metrics_after['error']}")
+                    metrics_after = {}
 
-            # Wait for processing
-            click.echo("   Waiting for processing to complete...")
-            await asyncio.sleep(2)
+                # Calculate and print results
+                results = calculate_results(
+                    count, test_duration, latencies, metrics_before, metrics_after
+                )
+                print_results(results, proto)
 
-            # Get metrics after test
-            metrics_after = await get_metrics(metrics_url)
-            if "error" in metrics_after:
-                click.echo(f"   ⚠️  Could not fetch metrics: {metrics_after['error']}")
-                metrics_after = {}
-
-            # Calculate and print results
-            results = calculate_results(count, duration, latencies, metrics_before, metrics_after)
-            print_results(results, proto)
-
-    try:
-        asyncio.run(asyncio.wait_for(run_test(), timeout=timeout * 2))
-    except asyncio.TimeoutError:
-        click.echo(f"\n❌ Test timed out after {timeout * 2}s", err=True)
-        raise SystemExit(1)
-    except KeyboardInterrupt:
-        click.echo("\n⚠️  Test interrupted")
-        raise SystemExit(1)
-    except Exception as e:
-        click.echo(f"\n❌ Test failed: {e}", err=True)
-        raise SystemExit(1)
+        try:
+            asyncio.run(asyncio.wait_for(run_burst_test(), timeout=timeout * 2))
+        except asyncio.TimeoutError:
+            click.echo(f"\n❌ Test timed out after {timeout * 2}s", err=True)
+            raise SystemExit(1)
+        except KeyboardInterrupt:
+            click.echo("\n⚠️  Test interrupted")
+            raise SystemExit(1)
+        except Exception as e:
+            click.echo(f"\n❌ Test failed: {e}", err=True)
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

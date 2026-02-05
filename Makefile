@@ -1,4 +1,4 @@
-.PHONY: help build up down logs test dev monitoring clean validate simulate perf perf-test
+.PHONY: help build up down logs test dev monitoring clean validate simulate perf perf-test perf-long perf-long-test
 
 # Default target
 help:
@@ -20,6 +20,11 @@ help:
 	@echo "Monitoring:"
 	@echo "  make monitoring - Start with Prometheus & Grafana"
 	@echo "  make metrics    - Show current metrics"
+	@echo ""
+	@echo "Performance Testing:"
+	@echo "  make perf           - Burst test (10k messages)"
+	@echo "  make perf-long      - Long-running test (5 min @ 500 msg/s)"
+	@echo "  make perf-long-test - Custom long test (DURATION=min RATE=msg/s)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean      - Remove containers, volumes, and logs"
@@ -121,3 +126,18 @@ perf-down:
 # Run performance test only (assumes services are up)
 perf-test:
 	uv run python tests/perf/test_performance.py -h localhost -p 5514 -n 10000 --protocol both -t 120
+
+# Long-running performance test (5 minutes at 500 msg/s)
+perf-long: perf-up
+	@sleep 3
+	@echo "Running long performance test (5 min @ 500 msg/s)..."
+	uv run python tests/perf/test_performance.py -h localhost -p 5514 -d 5 -r 500 --protocol udp --report-interval 10
+	@make perf-down
+
+# Long-running performance test only (assumes services are up)
+# Usage: make perf-long-test DURATION=60 RATE=1000
+DURATION ?= 5
+RATE ?= 500
+PROTOCOL ?= udp
+perf-long-test:
+	uv run python tests/perf/test_performance.py -h localhost -p 5514 -d $(DURATION) -r $(RATE) --protocol $(PROTOCOL) --report-interval 10
