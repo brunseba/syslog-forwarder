@@ -1,7 +1,9 @@
 # syslog-fwd
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/v/release/brunseba/syslog-forwarder)](https://github.com/brunseba/syslog-forwarder/releases)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://brunseba.github.io/syslog-forwarder/)
 
 A lightweight, pure Python syslog forwarder with simple YAML configuration.
 
@@ -13,9 +15,10 @@ A lightweight, pure Python syslog forwarder with simple YAML configuration.
 - **Message transformation** - Rewrite, mask, or remove fields before forwarding
 - **Multiple destinations** - Forward to different servers based on rules
 - **RFC compliant** - Supports RFC 3164 (BSD) and RFC 5424 (modern) formats
-- **Prometheus metrics** - Built-in `/metrics` endpoint
-- **Lightweight** - Single Python package, no external dependencies
-- **Docker ready** - Official image available
+- **Prometheus metrics** - Built-in `/metrics` and `/health` endpoints
+- **Config export** - Convert to syslog-ng format for comparison/migration
+- **Lightweight** - Single Python package, minimal dependencies
+- **Docker ready** - Multi-stage build with monitoring stack
 
 ## Quick Start
 
@@ -123,6 +126,7 @@ syslog-fwd init                # Generate example config
 syslog-fwd validate -c FILE    # Validate configuration
 syslog-fwd run -c FILE         # Run forwarder
 syslog-fwd simulate -d HOST    # Send test messages
+syslog-fwd export -c FILE      # Export to syslog-ng format
 ```
 
 ## Metrics
@@ -135,6 +139,21 @@ Prometheus metrics available at `/metrics`:
 - `syslog_destination_up{destination}`
 
 Health check available at `/health`.
+
+## Docker Compose with Monitoring
+
+```bash
+# Start with Prometheus + Grafana
+make monitoring
+
+# Access Grafana dashboard
+open http://localhost:3000  # admin/admin
+
+# Run performance test
+make perf
+```
+
+See `docker-compose.yml` for full sandbox environment.
 
 ## Filter Examples
 
@@ -209,11 +228,17 @@ filters:
     destinations: [central]
 ```
 
+## Documentation
+
+- [User Guide](https://brunseba.github.io/syslog-forwarder/user-guide/) - Complete usage documentation
+- [Architecture](https://brunseba.github.io/syslog-forwarder/architecture/) - Component models and diagrams
+- [Changelog](CHANGELOG.md) - Release history
+
 ## Development
 
 ```bash
 # Clone repository
-git clone https://github.com/brun_s/syslog-forwarder.git
+git clone https://github.com/brunseba/syslog-forwarder.git
 cd syslog-forwarder
 
 # Install dependencies
@@ -227,8 +252,11 @@ uv run ruff check src/
 
 # Install pre-commit hooks
 uv run pre-commit install
+
+# Build documentation
+uv run mkdocs serve
 ```
 
 ## License
 
-Apache License 2.0
+MIT License - see [LICENSE](LICENSE) for details.
